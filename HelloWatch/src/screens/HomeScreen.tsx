@@ -12,6 +12,7 @@ type Props = {
   onSave: () => void;
   onOpenSaved: () => void;
   onOpenMap: () => void;
+  onOpenDrive: () => void;
 };
 
 export default function HomeScreen({
@@ -21,6 +22,7 @@ export default function HomeScreen({
   onSave,
   onOpenSaved,
   onOpenMap,
+  onOpenDrive,
 }: Props) {
   const scroll = useRotorScroll();
 
@@ -69,6 +71,20 @@ export default function HomeScreen({
         ]}>
         <Text style={styles.buttonText}>Save location</Text>
       </Pressable>
+
+      <Pressable
+        disabled={savedCount === 0}
+        onPress={onOpenDrive}
+        style={({pressed}) => [
+          styles.driveButton,
+          pressed && styles.drivePressed,
+          savedCount === 0 && styles.buttonDisabled,
+        ]}>
+        <Text style={styles.driveText}>Drive mode</Text>
+      </Pressable>
+      {savedCount === 0 ? (
+        <Text style={styles.driveHint}>Save a location first</Text>
+      ) : null}
 
       <View style={styles.footer}>
         <Pressable
@@ -165,6 +181,27 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: '700',
+  },
+  driveButton: {
+    backgroundColor: colors.saved,
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 26,
+    marginBottom: 4,
+  },
+  drivePressed: {
+    backgroundColor: colors.saved,
+    opacity: 0.75,
+  },
+  driveText: {
+    color: colors.background,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  driveHint: {
+    color: colors.muted,
+    fontSize: 11,
+    marginBottom: 6,
   },
   secondaryButton: {
     backgroundColor: colors.surfaceAlt,

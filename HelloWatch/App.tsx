@@ -5,6 +5,7 @@ import Geolocation from '@react-native-community/geolocation';
 import HomeScreen from './src/screens/HomeScreen';
 import SavedListScreen from './src/screens/SavedListScreen';
 import MapScreen from './src/screens/MapScreen';
+import DriveScreen from './src/screens/DriveScreen';
 import {
   distanceMeters,
   getCurrentPosition,
@@ -26,6 +27,7 @@ const PRESS_HAPTIC_PATTERN = [0, 400, 200, 400, 200, 450];
 type Screen =
   | {name: 'home'}
   | {name: 'list'}
+  | {name: 'drive'}
   | {name: 'map'; focusId?: string | null; fitAll?: boolean};
 
 async function startTrackingService() {
@@ -92,9 +94,11 @@ function App() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [locations, setLocations] = useState<SavedLocation[]>([]);
   const [screen, setScreen] = useState<Screen>({name: 'home'});
+  const [trackingReady, setTrackingReady] = useState(false);
   const lastFix = useRef<{latitude: number; longitude: number; time: number} | null>(
     null,
   );
+  const driveActive = screen.name === 'drive';
 
   useEffect(() => {
     loadLocations().then(setLocations);
@@ -102,9 +106,8 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    let watchId: number | null = null;
 
-    async function start() {
+    async function setup() {
       Geolocation.setRNConfiguration({
         locationProvider: 'playServices',
         skipPermissionRequests: true,
@@ -141,55 +144,65 @@ function App() {
 
       await startTrackingService();
 
-      watchId = Geolocation.watchPosition(
-        next => {
-          if (!cancelled) {
-            const nextPosition = toPosition(next.coords);
-            const now = Date.now();
-            const previous = lastFix.current;
-            if (nextPosition.speed == null && previous) {
-              const seconds = (now - previous.time) / 1000;
-              if (seconds > 0.5) {
-                nextPosition.speed =
-                  distanceMeters(previous, nextPosition) / seconds;
-              }
-            }
-            lastFix.current = {
-              latitude: nextPosition.latitude,
-              longitude: nextPosition.longitude,
-              time: now,
-            };
-            setGpsError(null);
-            setPosition(nextPosition);
-          }
-        },
-        () => {
-          if (!cancelled) {
-            setGpsError(current => current ?? 'Waiting for GPS signal...');
-          }
-        },
-        {
-          enableHighAccuracy: true,
-          interval: 2000,
-          fastestInterval: 1000,
-          distanceFilter: 5,
-        },
-      );
-
-      if (cancelled) {
-        Geolocation.clearWatch(watchId);
+      if (!cancelled) {
+        setTrackingReady(true);
       }
     }
 
-    start();
+    setup();
 
     return () => {
       cancelled = true;
-      if (watchId !== null) {
-        Geolocation.clearWatch(watchId);
-      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!trackingReady) {
+      return;
+    }
+
+    const watchId = Geolocation.watchPosition(
+      next => {
+        const nextPosition = toPosition(next.coords);
+        const now = Date.now();
+        const previous = lastFix.current;
+        if (nextPosition.speed == null && previous) {
+          const seconds = (now - previous.time) / 1000;
+          if (seconds > 0.5) {
+            nextPosition.speed =
+              distanceMeters(previous, nextPosition) / seconds;
+          }
+        }
+        lastFix.current = {
+          latitude: nextPosition.latitude,
+          longitude: nextPosition.longitude,
+          time: now,
+        };
+        setGpsError(null);
+        setPosition(nextPosition);
+      },
+      () => {
+        setGpsError(current => current ?? 'Waiting for GPS signal...');
+      },
+      driveActive
+        ? {
+            enableHighAccuracy: true,
+            interval: 1000,
+            fastestInterval: 500,
+            distanceFilter: 1,
+          }
+        : {
+            enableHighAccuracy: true,
+            interval: 2000,
+            fastestInterval: 1000,
+            distanceFilter: 5,
+          },
+    );
+
+    return () => {
+      Geolocation.clearWatch(watchId);
+    };
+  }, [trackingReady, driveActive]);
 
   async function handleSave() {
     if (!position) {
@@ -226,6 +239,16 @@ function App() {
     );
   }
 
+  if (screen.name === 'drive') {
+    return (
+      <DriveScreen
+        position={position}
+        locations={locations}
+        onExit={() => setScreen({name: 'home'})}
+      />
+    );
+  }
+
   if (screen.name === 'map') {
     return (
       <MapScreen
@@ -252,6 +275,7 @@ function App() {
       onSave={handleSave}
       onOpenSaved={() => setScreen({name: 'list'})}
       onOpenMap={() => setScreen({name: 'map', fitAll: true})}
+      onOpenDrive={() => setScreen({name: 'drive'})}
     />
   );
 }
