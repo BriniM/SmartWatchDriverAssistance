@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:release": "cd android && ./gradlew :app:assembleRelease -PreactNativeArchitectures=armeabi-v7a",
+    "watch:install": "bash scripts/install-watch.sh",
+    "watch:release": "bash scripts/install-watch.sh --build",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
